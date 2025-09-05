@@ -5,4 +5,4 @@ board:
   name: custom_plank
   vendor: vendor
   socs:
-    - name: nrf52840
+    - name: nrf52832
