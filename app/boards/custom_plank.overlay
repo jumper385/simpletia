@@ -1,0 +1,23 @@
+/{
+    aliases {
+        spibus = &spi0;
+    };
+};
+
+&spi0 {
+    status = "okay";
+
+    cs-gpios = <&gpio0 31 GPIO_ACTIVE_LOW>, <&gpio0 4 GPIO_ACTIVE_LOW>;
+
+    mcp3201: mcp3201@0 {
+        compatible = "spi-device";
+        spi-max-frequency = <200000>;
+        reg = <0>;
+    };
+
+    mcp48: mcp48@1 {
+        compatible = "spi-device";
+        spi-max-frequency = <200000>;
+        reg = <1>;
+    };
+};
