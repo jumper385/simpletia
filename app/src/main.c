@@ -112,8 +112,16 @@ static int handle_shell_write_dac(const struct shell *shell, size_t argc, char *
 	return 0;
 }
 
+// Added DAC read command to display current DAC configuration
+static int handle_shell_read_dac(const struct shell *shell, size_t argc, char **argv)
+{
+	shell_print(shell, "Current DAC configuration: Channel 0: %.3f V, Channel 1: %.3f V", current_dac[0], current_dac[1]);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_dac,
-	SHELL_CMD(write, NULL, "<channel> <voltage>", handle_shell_write_dac),
+	SHELL_CMD(write, NULL, "Set DAC: <channel> <voltage>", handle_shell_write_dac),
+	SHELL_CMD(read, NULL, "Show current DAC configuration", handle_shell_read_dac),
 	SHELL_SUBCMD_SET_END
 );
 
