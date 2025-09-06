@@ -127,6 +127,49 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
 
 SHELL_CMD_REGISTER(adc, &sub_adc, "ADC commands", NULL);
 
+// Replacing the old 'amux set' command with new 'amux mode' command
+static int handle_shell_set_amux_mode(const struct shell *shell, size_t argc, char **argv)
+{
+	if (argc != 2) {
+		shell_print(shell, "Usage: amux mode <N> where N = 0,1, or 2");
+		return -1;
+	}
+
+	int mode = atoi(argv[1]);
+	if (mode < 0 || mode > 2) {
+		shell_print(shell, "Error: mode must be 0, 1, or 2");
+		return -1;
+	}
+
+	int a0, a1;
+	const char *resistor;
+	switch (mode) {
+		case 0:
+			a0 = 0; a1 = 0; resistor = "10M"; break;
+		case 1:
+			a0 = 0; a1 = 1; resistor = "100k"; break;
+		case 2:
+			a0 = 1; a1 = 0; resistor = "1k"; break;
+		default:
+			return -1; // Should not reach here
+	}
+
+	struct gpio_dt_spec amuxa0 = GPIO_DT_SPEC_GET(AMUX_A0, gpios);
+	struct gpio_dt_spec amuxa1 = GPIO_DT_SPEC_GET(AMUX_A1, gpios);
+	gpio_pin_set_dt(&amuxa0, a0);
+	gpio_pin_set_dt(&amuxa1, a1);
+
+	shell_print(shell, "Analog multiplexer set to mode %d: A0=%d, A1=%d, resistor: %s", mode, a0, a1, resistor);
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_amux,
+	SHELL_CMD(mode, NULL, "Set analog multiplexer mode (0-2)", handle_shell_set_amux_mode),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(amux, &sub_amux, "Analog multiplexer commands", NULL);
+
 int main()
 {
 
@@ -161,13 +204,13 @@ int main()
 	while (1)
 	{
 
-		gpio_pin_set_dt(&dac_ldac, 1);
-		k_msleep(10);
-		gpio_pin_set_dt(&dac_ldac, 0);
+		// gpio_pin_set_dt(&dac_ldac, 1);
+		// k_msleep(10);
+		// gpio_pin_set_dt(&dac_ldac, 0);
 
 		// read_adc(spi_dev, &voltage, 2.5f);
 
-		// LOG_INF("ADC Voltage: %.3f V", voltage);
+		// printk("ADC Voltage: %.3f V\r\n", voltage);
 		k_sleep(K_MSEC(333));
 	}
 	return 0;
