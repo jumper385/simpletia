@@ -15,6 +15,8 @@
 
 LOG_MODULE_REGISTER(main);
 
+static float current_dac[2] = {0.0f, 0.0f};
+
 void write_dac_channel(const struct device *spi_dev, int channel, float voltage, float vref)
 {
 	// Validate channel value
@@ -101,6 +103,13 @@ static int handle_shell_write_dac(const struct shell *shell, size_t argc, char *
 	k_msleep(10);
 	gpio_pin_set_dt(&dac_ldac, 0);
 
+	// Update the global DAC configuration and print out the current settings
+	if (channel >= 0 && channel < 2) {
+		current_dac[channel] = (float)voltage;
+	}
+	shell_print(shell, "Current DAC configuration: Channel 0: %.3f V, Channel 1: %.3f V", current_dac[0], current_dac[1]);
+
+	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_dac,
