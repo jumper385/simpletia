@@ -2,7 +2,7 @@
 
 This circuit contains a TIA with multiple gain settings. It also contains a two channel DAC and a single ADC.
 
-![Simple TIA Board View](image-2.png)
+![Simple TIA Board View](doc/images/image-2.png)
 
 ### Features
 
@@ -13,7 +13,7 @@ This circuit contains a TIA with multiple gain settings. It also contains a two 
 
 ### Components
 
-![System Block Diagram of the Simple TIA](./image.png)
+![System Block Diagram of the Simple TIA](doc/images/image.png)
 
 - Microcontroller: NRF52832
 - DAC: MCP48FV12
@@ -24,11 +24,11 @@ This circuit contains a TIA with multiple gain settings. It also contains a two 
 
 To setup the device, plug it into your computer via a micro-usb to usb cable. And connect in the Electrode Lead Plug (DB-9) to the board.
 
-![Annotated TIA with USB and DB-9 Connections](image-5.png)
+![Annotated TIA with USB and DB-9 Connections](doc/images/image-5.png)
 
 Use a serial terminal program (like PuTTY, Tera Term, or picocom) to connect to the device. The device will enumerate as a COM port on Windows or a /dev/ttyUSB* device on Linux. The serial port operates at 115200 baud. You should be greeted with an empty terminal.
 
-![picocom view of the serial terminal](image-4.png)
+![picocom view of the serial terminal](doc/images/image-4.png)
 
 Once connected, you can type `help` to see a list of available commands.
 
@@ -91,7 +91,7 @@ Once configured, connect the DB-9 electrode lead plug to device under test. The 
 
 Connect the red wire to the electrode where current is expected to flow into the TIA (anode). Connect the blue/green wire to the electrode where current is expected to flow out of the TIA (cathode). The blue and green wires are shorted together on the DB-9 connector, so either can be used.
 
-![Sample Measurement Setup](image-6.png)
+![Sample Measurement Setup](doc/images/image-6.png)
 
 When configured, the device can now be used to make current measurements. The ADC can be read using the `adc read` command. The output of this command is the converted current measurement appropriate units based on the configured TIA gain (uA, nA and pA).
 
@@ -128,7 +128,7 @@ uart:~$
 ```
 
 > [!WARNING]
-> This unit is not precision-calibrated. Expect gain error (≈±30%) and significant offset errors, increasing at higher gains and in sub-nA/pA ranges. Use for relative trends rather than absolute measurements.
+> This unit is not precision-calibrated. Expect gain error (±30%) and offset errors, increasing at higher gains and in sub-nA/pA ranges. Use for relative trends rather than absolute measurements.
 
 > [!NOTE]
 > `TODO`
