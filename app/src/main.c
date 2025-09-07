@@ -16,6 +16,7 @@
 LOG_MODULE_REGISTER(main);
 
 static float current_dac[2] = {0.0f, 0.0f};
+static int amux_mode = 0; 
 
 void write_dac_channel(const struct device *spi_dev, int channel, float voltage, float vref)
 {
@@ -76,6 +77,8 @@ void read_adc(const struct device *spi_dev, float *voltage, float vref)
 
 	*voltage = ((float)adc_code / 8192.0f) * vref;
 
+	LOG_INF("ADC Voltage: %.3f V", *voltage);
+
 	return;
 }
 
@@ -126,7 +129,6 @@ static int handle_shell_write_dac(const struct shell *shell, size_t argc, char *
 	return 0;
 }
 
-// Added DAC read command to display current DAC configuration
 static int handle_shell_read_dac(const struct shell *shell, size_t argc, char **argv)
 {
 	shell_print(shell, "Current DAC configuration: Channel 0: %.3f V, Channel 1: %.3f V", current_dac[0], current_dac[1]);
@@ -141,13 +143,40 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_dac,
 
 SHELL_CMD_REGISTER(dac, &sub_dac, "DAC commands", NULL);
 
-// Added ADC shell command to read ADC value from the single channel
 static int handle_shell_read_adc(const struct shell *shell, size_t argc, char **argv)
 {
 	struct device *spi_dev = DEVICE_DT_GET(SPI_BUS);
 	float adc_voltage = 0.0f;
-	read_adc(spi_dev, &adc_voltage, 2.5f);
-	shell_print(shell, "ADC Voltage: %.3f V", adc_voltage);
+	read_adc(spi_dev, &adc_voltage, 2.520f);
+
+	// calculate current	
+	float current_reading;
+	float scale_factor;
+	char *unit;
+	switch (amux_mode) {
+		case 0:
+			current_reading = -1 * (adc_voltage - current_dac[1]) / 10e6; // 10M resistor
+			unit = "pA";
+			scale_factor = 1e12;
+			break;
+		case 1:
+			current_reading = -1 * (adc_voltage - current_dac[1]) / 146e3; // 100k resistor
+			unit = "nA";
+			scale_factor = 1e9;
+			break;
+		case 2:
+			current_reading = -1 * (adc_voltage - current_dac[1]) / 1e3; // 1k resistor
+			unit = "uA";
+			scale_factor = 1e6;
+			break;
+		default:
+			current_reading = 0.0f; // Should not reach here
+			unit = "A";
+			scale_factor = 1.0f;
+			break;
+	}
+
+	shell_print(shell, "Current: %.3f %s", current_reading * scale_factor, unit);
 	return 0;
 }
 
@@ -158,7 +187,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
 
 SHELL_CMD_REGISTER(adc, &sub_adc, "ADC commands", NULL);
 
-// Replacing the old 'amux set' command with new 'amux mode' command
 static int handle_shell_set_amux_mode(const struct shell *shell, size_t argc, char **argv)
 {
 	if (argc != 2) {
@@ -184,6 +212,8 @@ static int handle_shell_set_amux_mode(const struct shell *shell, size_t argc, ch
 		default:
 			return -1; // Should not reach here
 	}
+
+	amux_mode = mode;
 
 	struct gpio_dt_spec amuxa0 = GPIO_DT_SPEC_GET(AMUX_A0, gpios);
 	struct gpio_dt_spec amuxa1 = GPIO_DT_SPEC_GET(AMUX_A1, gpios);
@@ -220,16 +250,15 @@ int main()
 	gpio_pin_set_dt(&amuxa0, 1);
 	gpio_pin_set_dt(&amuxa1, 0);
 
+	// default configs
+	write_dac_channel(spi_dev, 0, 0.0f, 3.3f);
+	write_dac_channel(spi_dev, 1, 1.25f, 3.3f);
+	current_dac[0] = 0.0f;
+	current_dac[1] = 1.25f;
+	amux_mode = 2;
+
 	while (1)
 	{
-
-		// gpio_pin_set_dt(&dac_ldac, 1);
-		// k_msleep(10);
-		// gpio_pin_set_dt(&dac_ldac, 0);
-
-		// read_adc(spi_dev, &voltage, 2.5f);
-
-		// printk("ADC Voltage: %.3f V\r\n", voltage);
 		k_sleep(K_MSEC(333));
 	}
 	return 0;
