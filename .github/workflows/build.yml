@@ -2,22 +2,20 @@ name: Build
 
 on:
   push:
-  pull_request:
-  schedule:
-    - cron: "0 0 * * *"
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-13, macos-14, windows-2022]
+        os: [macos-14]
+        device: [custom_plank]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: example-application
+          path: simpletia
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,23 +25,26 @@ jobs:
       - name: Setup Zephyr project
         uses: zephyrproject-rtos/action-zephyr-setup@v1
         with:
-          app-path: example-application
+          app-path: simpletia
           toolchains: arm-zephyr-eabi
 
       - name: Build firmware
-        working-directory: example-application
+        working-directory: simpletia
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
-          fi
-          west twister -T app -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
+          west build -b ${{ matrix.device }} app
 
-      - name: Twister Tests
-        working-directory: example-application
-        shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
-          fi
-          west twister -T tests -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
+      - name: pwd
+        run: pwd
+      
+      - name: List files
+        run: ls -ltra
+      
+      - name: List build files
+        run: ls -ltra simpletia/build/zephyr
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.device }}
+          path: simpletia/build/zephyr/zephyr.elf
