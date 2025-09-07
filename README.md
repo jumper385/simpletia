@@ -1,138 +1,157 @@
-# Zephyr Example Application
+# Simple TIA
 
-<a href="https://github.com/zephyrproject-rtos/example-application/actions/workflows/build.yml?query=branch%3Amain">
-  <img src="https://github.com/zephyrproject-rtos/example-application/actions/workflows/build.yml/badge.svg?event=push">
-</a>
-<a href="https://github.com/zephyrproject-rtos/example-application/actions/workflows/docs.yml?query=branch%3Amain">
-  <img src="https://github.com/zephyrproject-rtos/example-application/actions/workflows/docs.yml/badge.svg?event=push">
-</a>
-<a href="https://zephyrproject-rtos.github.io/example-application">
-  <img alt="Documentation" src="https://img.shields.io/badge/documentation-3D578C?logo=sphinx&logoColor=white">
-</a>
-<a href="https://zephyrproject-rtos.github.io/example-application/doxygen">
-  <img alt="API Documentation" src="https://img.shields.io/badge/API-documentation-3D578C?logo=c&logoColor=white">
-</a>
+This circuit contains a TIA with multiple gain settings. It also contains a two channel DAC and a single ADC.
 
-This repository contains a Zephyr example application. The main purpose of this
-repository is to serve as a reference on how to structure Zephyr-based
-applications. Some of the features demonstrated in this example are:
+![Simple TIA Board View](image-2.png)
 
-- Basic [Zephyr application][app_dev] skeleton
-- [Zephyr workspace applications][workspace_app]
-- [Zephyr modules][modules]
-- [West T2 topology][west_t2]
-- [Custom boards][board_porting]
-- Custom [devicetree bindings][bindings]
-- Out-of-tree [drivers][drivers]
-- Out-of-tree libraries
-- Example CI configuration (using GitHub Actions)
-- Custom [west extension][west_ext]
-- Custom [Zephyr runner][runner_ext]
-- Doxygen and Sphinx documentation boilerplate
+### Features
 
-This repository is versioned together with the [Zephyr main tree][zephyr]. This
-means that every time that Zephyr is tagged, this repository is tagged as well
-with the same version number, and the [manifest](west.yml) entry for `zephyr`
-will point to the corresponding Zephyr tag. For example, the `example-application`
-v2.6.0 will point to Zephyr v2.6.0. Note that the `main` branch always
-points to the development branch of Zephyr, also `main`.
+- Singled Ended Transimpedance Amplifier (TIA) with multiple gain settings
+- Configurable TIA Gain for current measurements from 1mA to 100pA
+- Configurable Load Bias up to +/- 1.65V
+- UART Shell Interface for configuring the DAC, Reading from the ADC and Configuring the TIA Gain.
 
-[app_dev]: https://docs.zephyrproject.org/latest/develop/application/index.html
-[workspace_app]: https://docs.zephyrproject.org/latest/develop/application/index.html#zephyr-workspace-app
-[modules]: https://docs.zephyrproject.org/latest/develop/modules.html
-[west_t2]: https://docs.zephyrproject.org/latest/develop/west/workspaces.html#west-t2
-[board_porting]: https://docs.zephyrproject.org/latest/guides/porting/board_porting.html
-[bindings]: https://docs.zephyrproject.org/latest/guides/dts/bindings.html
-[drivers]: https://docs.zephyrproject.org/latest/reference/drivers/index.html
-[zephyr]: https://github.com/zephyrproject-rtos/zephyr
-[west_ext]: https://docs.zephyrproject.org/latest/develop/west/extensions.html
-[runner_ext]: https://docs.zephyrproject.org/latest/develop/modules.html#external-runners
+### Components
+
+![System Block Diagram of the Simple TIA](./image.png)
+
+- Microcontroller: NRF52832
+- DAC: MCP48FV12
+- ADC: MCP3201
+- Serial Port: CH340 USB to UART Bridge
 
 ## Getting Started
 
-Before getting started, make sure you have a proper Zephyr development
-environment. Follow the official
-[Zephyr Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html).
+To setup the device, plug it into your computer via a micro-usb to usb cable. And connect in the Electrode Lead Plug (DB-9) to the board.
 
-### Initialization
+![Annotated TIA with USB and DB-9 Connections](image-5.png)
 
-The first step is to initialize the workspace folder (``my-workspace``) where
-the ``example-application`` and all Zephyr modules will be cloned. Run the following
-command:
+Use a serial terminal program (like PuTTY, Tera Term, or picocom) to connect to the device. The device will enumerate as a COM port on Windows or a /dev/ttyUSB* device on Linux. The serial port operates at 115200 baud. You should be greeted with an empty terminal.
 
-```shell
-# initialize my-workspace for the example-application (main branch)
-west init -m https://github.com/zephyrproject-rtos/example-application --mr main my-workspace
-# update Zephyr modules
-cd my-workspace
-west update
+![picocom view of the serial terminal](image-4.png)
+
+Once connected, you can type `help` to see a list of available commands.
+
+```
+uart:~$ help
+
+Available commands:
+  adc      : ADC commands
+  amux     : Analog multiplexer commands
+  app      : Application version information commands
+  clear    : Clear screen.
+  dac      : DAC commands
+  date     : Date commands
+  device   : Device commands
+  devmem   : Read/write physical memory
+             Usage:
+             Read memory at address with optional width:
+             devmem <address> [<width>]
+             Write memory at address with mandatory width and value:
+             devmem <address> <width> <value>
+  help     : Prints the help message.
+  history  : Command history.
+  kernel   : Kernel commands
+  rem      : Ignore lines beginning with 'rem '
+  resize   : Console gets terminal screen size or assumes default in case the
+             readout fails. It must be executed after each terminal width change
+             to ensure correct text display.
+  retval   : Print return value of most recent command
+  shell    : Useful, not Unix-like shell commands.
+
+uart:~$ 
 ```
 
-### Building and running
+Before making measurements ensure the DAC channels are set to the desired voltages and the TIA gain is set appropriately for your measurement. Refer to [Serial Commands](#serial-commands) for a list of available commands to configure the device.
 
-To build the application, run the following command:
+> [!WARNING]
+> By default, devie is configured at startup as follows: 
+> - DAC Channel 0: 0V
+> - DAC Channel 1: 1.25V
+> - TIA Gain: 1 KOhm
 
-```shell
-cd example-application
-west build -b $BOARD app
+> [!IMPORTANT]
+>It should be noted that the voltage accross the electrodes is determined by the difference between the two DAC channels.
+> DAC Channel 1 is the voltage applied to the non-inverting input of the TIA. This is what enables the TIA to measure both, positve and negative going currents.
+>
+> DAC Channel 0 is the voltage applied to bias the the load. This can be configured to be higher or lower than the voltage on DAC Channel 1 - enabling both, negative and positive bias.
+> 
+> The voltage accross the electrodes is given by: `V_electrodes = V_DAC1 - V_DAC0`
+> For example, if DAC Channel 1 is set to 1.25V and DAC Channel 0 is set to 0V, the voltage accross the electrodes is +1.25
+>
+> It is important to know that the maximum output of each DAC channel is 3.3V.
+
+Once configured, connect the DB-9 electrode lead plug to device under test. The pinout of the DB-9 connector is as follows:
+
+| Wire Color |  Description               |
+| - | - |
+| Red        | TIA Input |
+| Blue      | Bias Voltage Output |
+| Green      | Bias Voltage Output (Shorted to Blue) |
+
+Connect the red wire to the electrode where current is expected to flow into the TIA (anode). Connect the blue/green wire to the electrode where current is expected to flow out of the TIA (cathode). The blue and green wires are shorted together on the DB-9 connector, so either can be used.
+
+![Sample Measurement Setup](image-6.png)
+
+When configured, the device can now be used to make current measurements. The ADC can be read using the `adc read` command. The output of this command is the converted current measurement appropriate units based on the configured TIA gain (uA, nA and pA).
+
+```
+uart:~$ amux mode 1
+Analog multiplexer set to mode 1: A0=0, A1=1, resistor: 100k
+
+uart:~$ dac write 0 0
+DAC Channel 0 set to 0.000 V (10-bit code: 0)
+Current DAC configuration: Channel 0: 0.000 V, Channel 1: 1.250 V
+
+uart:~$ dac write 1 1.25
+DAC Channel 1 set to 1.250 V (10-bit code: 387)
+Current DAC configuration: Channel 0: 0.000 V, Channel 1: 1.250 V
+
+uart:~$ adc read
+Current: -2308.199 nA
+[00:29:03.344,726] <inf> main: ADC Code: 0x1427
+[00:29:03.344,757] <inf> main: ADC Voltage: 1.587 V
+
+// Reduce Impedance from 2M to 1M
+
+uart:~$ adc read
+Current: -2853.904 nA
+[00:30:53.839,843] <inf> main: ADC Code: 0x152A
+[00:30:53.839,874] <inf> main: ADC Voltage: 1.667 V
+
+// NOTE: The 500nA increase in current due to the 
+//       decrease in impedance. 
+//       This is within the expected difference 
+//       between the measurements.
+
+uart:~$ 
 ```
 
-where `$BOARD` is the target board.
+> [!WARNING]
+> This unit is not precision-calibrated. Expect gain error (≈±30%) and significant offset errors, increasing at higher gains and in sub-nA/pA ranges. Use for relative trends rather than absolute measurements.
 
-You can use the `custom_plank` board found in this
-repository. Note that Zephyr sample boards may be used if an
-appropriate overlay is provided (see `app/boards`).
+> [!NOTE]
+> `TODO`
+>
+> - [ ] Improve Device Calibration
+> - [ ] Add user configurable gain settings in the Shell Interface
+> - [ ] Use NVR to store user settings across power cycles
 
-A sample debug configuration is also provided. To apply it, run the following
-command:
+## Serial Commands
 
-```shell
-west build -b $BOARD app -- -DEXTRA_CONF_FILE=debug.conf
-```
+### DAC Commands
 
-Once you have built the application, run the following command to flash it:
+- `dac write <channel> <value>`: Set the DAC output for the specified channel (0 or 1) to the given value (0-3.3V). 
 
-```shell
-west flash
-```
+- `dac read`: Read the configured DAC voltages for both channels.
 
-### Testing
+### ADC Commands
 
-To execute Twister integration tests, run the following command:
+- `adc read`: Read the current value from the ADC.
 
-```shell
-west twister -T tests --integration
-```
+### TIA Gain Commands
 
-### Documentation
-
-A minimal documentation setup is provided for Doxygen and Sphinx. To build the
-documentation first change to the ``doc`` folder:
-
-```shell
-cd doc
-```
-
-Before continuing, check if you have Doxygen installed. It is recommended to
-use the same Doxygen version used in [CI](.github/workflows/docs.yml). To
-install Sphinx, make sure you have a Python installation in place and run:
-
-```shell
-pip install -r requirements.txt
-```
-
-API documentation (Doxygen) can be built using the following command:
-
-```shell
-doxygen
-```
-
-The output will be stored in the ``_build_doxygen`` folder. Similarly, the
-Sphinx documentation (HTML) can be built using the following command:
-
-```shell
-make html
-```
-
-The output will be stored in the ``_build_sphinx`` folder. You may check for
-other output formats other than HTML by running ``make help``.
+- `amux mode <mode>`: Set the TIA gain mode. Available modes are:
+  - `0` for a 10 MOhm gain
+  - `1` for a 100 KOhm gain
+  - `2` for a 1 KOhm gain
