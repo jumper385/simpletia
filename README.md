@@ -4,6 +4,15 @@ This circuit contains a TIA with multiple gain settings. It also contains a two 
 
 ![Simple TIA Board View](doc/images/image-2.png)
 
+## Table of Contents
+- [Overview](#overview)
+- [Getting Started](#getting-started)
+  - [Hardware Setup](#hardware-setup)
+  - [Using the Shell Interface](#using-the-shell-interface)
+  - [Preparing for Measurements](#preparing-for-measurements)
+  - [Making Measurements](#making-measurements)
+- [Serial Commands](#serial-commands)
+
 ### Features
 
 - Singled Ended Transimpedance Amplifier (TIA) with multiple gain settings
@@ -22,6 +31,7 @@ This circuit contains a TIA with multiple gain settings. It also contains a two 
 
 ## Getting Started
 
+### Hardware Setup
 To setup the device, plug it into your computer via a micro-usb to usb cable. And connect in the Electrode Lead Plug (DB-9) to the board.
 
 ![Annotated TIA with USB and DB-9 Connections](doc/images/image-5.png)
@@ -30,6 +40,7 @@ Use a serial terminal program (like PuTTY, Tera Term, or picocom) to connect to 
 
 ![picocom view of the serial terminal](doc/images/image-4.png)
 
+### Using the Shell Interface
 Once connected, you can type `help` to see a list of available commands.
 
 ```
@@ -62,6 +73,7 @@ Available commands:
 uart:~$ 
 ```
 
+### Preparing for Measurements
 Before making measurements ensure the DAC channels are set to the desired voltages and the TIA gain is set appropriately for your measurement. Refer to [Serial Commands](#serial-commands) for a list of available commands to configure the device.
 
 > [!WARNING]
@@ -89,6 +101,7 @@ Once configured, connect the DB-9 electrode lead plug to device under test. The 
 | Blue      | Bias Voltage Output |
 | Green      | Bias Voltage Output (Shorted to Blue) |
 
+### Making Measurements
 Connect the red wire to the electrode where current is expected to flow into the TIA (anode). Connect the blue/green wire to the electrode where current is expected to flow out of the TIA (cathode). The blue and green wires are shorted together on the DB-9 connector, so either can be used.
 
 ![Sample Measurement Setup](doc/images/image-6.png)
