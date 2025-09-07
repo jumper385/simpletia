@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(main);
 
 static float current_dac[2] = {0.0f, 0.0f};
 
-void write_dac_channel(const struct device *spi_dev, int channel, uint16_t code, float vref)
+void write_dac_channel(const struct device *spi_dev, int channel, float voltage, float vref)
 {
 	// Validate channel value
 	if (channel < 0 || channel > 1)
@@ -26,10 +26,12 @@ void write_dac_channel(const struct device *spi_dev, int channel, uint16_t code,
 		return;
 	}
 
+	// Calculate DAC code based on voltage and reference (10-bit resolution)
+	uint16_t code = (uint16_t)((voltage / vref) * 1023.0f);
+	
 	// Build command: shift channel into position and split code into two bytes
 	uint8_t addr = channel << 3 | 0b00 << 1;
-    // uint8_t cmd[3] = { addr, (uint8_t)((code >> 8) & 0x0F), (uint8_t)(code & 0xF) };
-	uint8_t cmd[3] = { addr, code >> 8 & 0b00001111, code & 0xFF};
+	uint8_t cmd[3] = { addr, (uint8_t)((code >> 8) & 0x03), (uint8_t)(code & 0xFF) };
 
     struct spi_buf tx_buf = { .buf = cmd, .len = sizeof(cmd) };
     struct spi_buf_set tx_bufs = { .buffers = &tx_buf, .count = 1 };
@@ -84,38 +86,25 @@ static int handle_shell_write_dac(const struct shell *shell, size_t argc, char *
 
 	if (argc != 3)
 	{
-		shell_print(shell, "Usage: dac write <channel> <binary_code>");
+		shell_print(shell, "Usage: dac write <channel> <voltage>");
 		shell_print(shell, "       channel: 0 or 1");
-		shell_print(shell, "       binary_code: 12-bit binary value (e.g., 101010101010)");
+		shell_print(shell, "       voltage: voltage value in range 0-3.3V");
 		return -1;
 	}
 
 	int channel = atoi(argv[1]);
 	
-	// Parse the 12-bit binary string
-	const char *binary_str = argv[2];
-	size_t len = strlen(binary_str);
-	if (len != 12) {
-		shell_print(shell, "Error: Binary code must be exactly 12 bits (e.g., 101010101010)");
-		return -1;
+	// Parse the voltage value
+	double voltage = atof(argv[2]);
+	if (voltage < 0.0 || voltage > 3.3) {
+		shell_print(shell, "Warning: Voltage %.3f V is outside the recommended range (0-3.3V)", voltage);
 	}
-	
-	uint16_t code = 0;
-	for (int i = 0; i < 12; i++) {
-		if (binary_str[i] != '0' && binary_str[i] != '1') {
-			shell_print(shell, "Error: Binary code must contain only 0s and 1s");
-			return -1;
-		}
-		code = (code << 1) | (binary_str[i] - '0');
-	}
-
-	code = 0b111111111111 & code; // Ensure code is 12-bit
 	
 	struct device *spi_dev = DEVICE_DT_GET(SPI_BUS);
-	write_dac_channel(spi_dev, channel, code, 3.3f);
+	write_dac_channel(spi_dev, channel, (float)voltage, 3.3f);
 	
-	// Calculate voltage from code for display purposes
-	float voltage = ((float)code / 4096.0f) * 3.3f;
+	// Calculate code for display purposes (10-bit DAC)
+	uint16_t code = (uint16_t)((voltage / 3.3f) * 1023.0f);
 
 	// ldac pulse
 	struct gpio_dt_spec dac_ldac = GPIO_DT_SPEC_GET(DAC_LDAC, gpios);
@@ -127,10 +116,10 @@ static int handle_shell_write_dac(const struct shell *shell, size_t argc, char *
 
 	// Update the global DAC configuration and print out the current settings
 	if (channel >= 0 && channel < 2) {
-		current_dac[channel] = voltage;
+		current_dac[channel] = (float)voltage;
 	}
-	shell_print(shell, "DAC Channel %d set with binary: %s (code: %u, ~%.3f V)", 
-		channel, binary_str, code, voltage);
+	shell_print(shell, "DAC Channel %d set to %.3f V (10-bit code: %u)", 
+		channel, voltage, code);
 	shell_print(shell, "Current DAC configuration: Channel 0: %.3f V, Channel 1: %.3f V", 
 		current_dac[0], current_dac[1]);
 
@@ -145,7 +134,7 @@ static int handle_shell_read_dac(const struct shell *shell, size_t argc, char **
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_dac,
-	SHELL_CMD(write, NULL, "Set DAC: <channel> <binary_code>", handle_shell_write_dac),
+	SHELL_CMD(write, NULL, "Set DAC: <channel> <voltage>", handle_shell_write_dac),
 	SHELL_CMD(read, NULL, "Show current DAC configuration", handle_shell_read_dac),
 	SHELL_SUBCMD_SET_END
 );
