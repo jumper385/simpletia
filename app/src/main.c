@@ -16,7 +16,12 @@
 LOG_MODULE_REGISTER(main);
 
 static float current_dac[2] = {0.0f, 0.0f};
+static float voltage_mode_offsets[3] = {0.0f, 0.0f, 0.0f}; // offsets for modes 0, 1, 2
 static int amux_mode = 0; 
+static bool continuous_sampling = false;
+static K_THREAD_STACK_DEFINE(sampling_stack, 1024);
+static struct k_thread sampling_thread;
+static k_tid_t sampling_tid; 
 
 void write_dac_channel(const struct device *spi_dev, int channel, float voltage, float vref)
 {
@@ -73,11 +78,11 @@ void read_adc(const struct device *spi_dev, float *voltage, float vref)
 	uint16_t adc_code = rx_buf[0] << 8 | rx_buf[1];
 	adc_code = adc_code;
 	// print out hex code 0xXXX
-	LOG_INF("ADC Code: 0x%03X", adc_code);
+	// LOG_INF("ADC Code: 0x%03X", adc_code);
 
 	*voltage = ((float)adc_code / 8192.0f) * vref;
 
-	LOG_INF("ADC Voltage: %.3f V", *voltage);
+	// LOG_INF("ADC Voltage: %.3f V", *voltage);
 
 	return;
 }
@@ -180,8 +185,101 @@ static int handle_shell_read_adc(const struct shell *shell, size_t argc, char **
 	return 0;
 }
 
+// Thread function for continuous ADC sampling
+void continuous_sampling_thread(void *arg1, void *arg2, void *arg3)
+{
+    struct device *spi_dev = DEVICE_DT_GET(SPI_BUS);
+    float adc_voltage;
+    int sample_count = 0;
+    
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+    
+    while (continuous_sampling) {
+        read_adc(spi_dev, &adc_voltage, 2.520f);
+        
+        // Calculate current based on the AMUX mode
+        float current_reading;
+        float scale_factor;
+        char *unit;
+        switch (amux_mode) {
+            case 0:
+                current_reading = -1 * (adc_voltage - voltage_mode_offsets[0] - current_dac[1]) / 10e6;
+                unit = "pA";
+                scale_factor = 1e12;
+                break;
+            case 1:
+                current_reading = -1 * (adc_voltage - voltage_mode_offsets[1] - current_dac[1]) / 146e3;
+                unit = "nA";
+                scale_factor = 1e9;
+                break;
+            case 2:
+                current_reading = -1 * (adc_voltage - voltage_mode_offsets[2] - current_dac[1]) / 1e3;
+                unit = "uA";
+                scale_factor = 1e6;
+                break;
+            default:
+                current_reading = 0.0f;
+                unit = "A";
+                scale_factor = 1.0f;
+                break;
+        }
+        
+        printk("Sample %d: Current = %.3f %s\n", sample_count++, current_reading * scale_factor, unit);
+        k_msleep(100); // Sample every 100ms
+    }
+}
+
+// Command to control continuous sampling mode
+static int handle_shell_adc_continuous(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "Usage: adc continuous <on|off>");
+        return -1;
+    }
+    
+    if (strcmp(argv[1], "on") == 0) {
+        if (continuous_sampling) {
+            shell_print(shell, "Continuous sampling is already running");
+            return 0;
+        }
+        
+        continuous_sampling = true;
+        shell_print(shell, "Starting continuous ADC sampling...");
+        
+        // Start sampling thread
+        sampling_tid = k_thread_create(&sampling_thread, sampling_stack,
+                                     K_THREAD_STACK_SIZEOF(sampling_stack),
+                                     continuous_sampling_thread,
+                                     NULL, NULL, NULL,
+                                     5, 0, K_NO_WAIT);
+        
+        k_thread_name_set(sampling_tid, "adc_sampling");
+        
+    } else if (strcmp(argv[1], "off") == 0) {
+        if (!continuous_sampling) {
+            shell_print(shell, "Continuous sampling is not running");
+            return 0;
+        }
+        
+        continuous_sampling = false;
+        shell_print(shell, "Stopping continuous ADC sampling...");
+        
+        // Thread will terminate itself when continuous_sampling becomes false
+        k_thread_join(&sampling_thread, K_SECONDS(1));
+        
+    } else {
+        shell_print(shell, "Invalid argument: %s (must be 'on' or 'off')", argv[1]);
+        return -1;
+    }
+    
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
 	SHELL_CMD(read, NULL, "Read ADC value", handle_shell_read_adc),
+    SHELL_CMD(continuous, NULL, "Start/stop continuous sampling: <on|off>", handle_shell_adc_continuous),
 	SHELL_SUBCMD_SET_END
 );
 
@@ -231,8 +329,20 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_amux,
 
 SHELL_CMD_REGISTER(amux, &sub_amux, "Analog multiplexer commands", NULL);
 
+// Helper function to ensure continuous sampling is off when exiting the application
+static void app_exit_handler(void)
+{
+    if (continuous_sampling) {
+        continuous_sampling = false;
+        k_thread_join(&sampling_thread, K_SECONDS(1));
+        printk("Stopped continuous sampling on exit\n");
+    }
+}
+
 int main()
 {
+	// Register exit handler to clean up resources
+	atexit(app_exit_handler);
 
 	struct device *spi_dev = DEVICE_DT_GET(SPI_BUS);
 	struct gpio_dt_spec dac_ldac = GPIO_DT_SPEC_GET(DAC_LDAC, gpios);
